@@ -3,20 +3,27 @@
 #include "Player2Wins.h"
 #include <stdint.h>
 
-#define DIVIDE_CONST 205    // Value we divide our potentiometer values by to get our range
 #define SPEED 150           // How fast the ball is going
 #define DELAY 1             // Our delay for the paddles / main loop
 #define WIDTH 12
 #define HEIGHT 8
+#define PADDLE_SIZE 4       // How big the paddles are
+#define DIVIDE_CONST 205    // Value we divide our potentiometer values by to get our range for the paddles; this works for paddle_size = 4
 
 ArduinoLEDMatrix matrix;
 
-// struct player {
-//   int score;
-//   int paddle[4];
-//   bool check;
-// };
+struct ball {
+  int x;
+  int y;
+  int xDir;
+  int yDir;
+};
 
+struct player {
+  int score;
+  int paddle[PADDLE_SIZE];
+  bool check;
+};
 
 int x = 5;        // x position of the ball
 int y = 4;        // y position of the ball
@@ -44,8 +51,8 @@ uint8_t frame[HEIGHT][WIDTH] = {
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
-int paddle1[4] = {2, 3, 4, 5};
-int paddle2[4] = {2, 3, 4, 5};
+int paddle1[PADDLE_SIZE];
+int paddle2[PADDLE_SIZE];
 
 void setup() {
   Serial.begin(9600);
@@ -55,7 +62,7 @@ void setup() {
 bool checkPaddle(int paddle[]) {
   bool check = false;
   int potential = -2;
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < PADDLE_SIZE; i++) {
     potential += i;
     if (potential > 2) {
       potential = 2;
@@ -82,6 +89,9 @@ void roundComplete() {
   Serial.print(player1_Score);
   Serial.print("\t");
   Serial.println(player2_Score);
+
+  frame[y][x] = 0;
+
   x = 5;
   y = 4;
   yDir = 0;
@@ -115,13 +125,13 @@ void loop() {
   int player2 = analogRead(A1) / DIVIDE_CONST;
 
   // Clear Paddles
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < PADDLE_SIZE; i++) {
     frame[paddle1[i]][0] = 0;
     frame[paddle2[i]][11] = 0;
   }
   
   // Print Paddles
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < PADDLE_SIZE; i++) {
     paddle1[i] = player1 + i;
     paddle2[i] = player2 + i;
     frame[paddle1[i]][0] = 1;
@@ -152,20 +162,20 @@ void loop() {
     yDir = -yDir;
   }
 
-  // If the ball is about to hit either one of the paddles
+  // Collision Detection
   if (x == 1) {
     check1 = checkPaddle(paddle1);
   } else if (x == 10) {
     check2 = checkPaddle(paddle2);
   }
 
-  if (!check1 || !check2) {
-    roundComplete();
-  }
-
   frame[y][x] = 1;
   k = 0;
   matrix.renderBitmap(frame, HEIGHT, WIDTH);
+
+  if (!check1 || !check2) {
+    roundComplete();
+  }
 
   delay(DELAY);
 }
