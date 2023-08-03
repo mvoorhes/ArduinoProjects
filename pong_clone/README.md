@@ -1,6 +1,6 @@
 # Pong Clone
 
-This is a simple pong clone developed for the Arduino Uno R4. It takes advantage of the 8x12 matrix that is built into the device.
+This is a simple pong clone developed for the Arduino Uno R4. It uses the 8x12 LED matrix built into the device to display the game.
 
 ## Required Parts
 
@@ -12,5 +12,4 @@ This is a simple pong clone developed for the Arduino Uno R4. It takes advantage
 ## Files
 
 - pong_clone.ino:   The main file
-- Player1Wins.h:    Contains animation for when player 1 wins
-- Player2Wins.h:    Contains animation for when player 2 wins
+- animations.h:     Contains animation for when someone wins

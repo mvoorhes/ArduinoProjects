@@ -1,6 +1,5 @@
 #include "Arduino_LED_Matrix.h"
-#include "Player1Wins.h"
-#include "Player2Wins.h"
+#include "animations.h"
 #include <stdint.h>
 
 #define SPEED 150           // How fast the ball is going
@@ -9,36 +8,34 @@
 #define HEIGHT 8
 #define PADDLE_SIZE 4       // How big the paddles are
 #define DIVIDE_CONST 205    // Value we divide our potentiometer values by to get our range for the paddles; this works for paddle_size = 4
+#define MAX_SCORE 5         // Highest score a player can get before winning
 
 ArduinoLEDMatrix matrix;
 
-struct ball {
-  int x;
-  int y;
-  int xDir;
-  int yDir;
+// Unused Structs
+struct point {
+  int x, y, xDir, yDir;
 };
 
 struct player {
-  int score;
-  int paddle[PADDLE_SIZE];
-  bool check;
+  int read;                     // Potentiometer value
+  int score;                    // Score for the player
+  int paddle[PADDLE_SIZE];      // Players paddle
+  bool check;                   // Boolean to check if player has won/lost a round  
 };
 
-int x = 5;        // x position of the ball
-int y = 4;        // y position of the ball
+struct point ball = {
+  .x = 5,
+  .y = 4,
+  .xDir = -1,
+  .yDir = 0
+};
 
-int xDir = -1;    // Direction in the x axis of the ball
-int yDir = 0;     // Direction in the y axis of the ball
+struct player player1;
+struct player player2;
 
 int k = 0;        // Timer for the ball
-
-bool check1 = true;     // Checks if game has been lost from paddle1
-bool check2 = true;     // Checks if game has been lost from paddle2
 bool gameOver = false;  // Prints a game over screen
-
-int player1_Score = 0;
-int player2_Score = 0;
 
 uint8_t frame[HEIGHT][WIDTH] = {
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
@@ -51,26 +48,25 @@ uint8_t frame[HEIGHT][WIDTH] = {
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
-int paddle1[PADDLE_SIZE];
-int paddle2[PADDLE_SIZE];
-
 void setup() {
   Serial.begin(9600);
   matrix.begin();
+  player1.score = player2.score = 0;
+  player1.check = player2.check = true;
 }
 
 bool checkPaddle(int paddle[]) {
   bool check = false;
-  int potential = -2;
+  int potential = -2;   // our potential yDir value
   for (int i = 0; i < PADDLE_SIZE; i++) {
     potential += i;
     if (potential > 2) {
       potential = 2;
     }
-    if (paddle[i] == y) {
+    if (paddle[i] == ball.y) {
       check = true;
-      xDir = -xDir;
-      yDir = potential;
+      ball.xDir = -ball.xDir;
+      ball.yDir = potential;
       break;
     }
   }
@@ -78,25 +74,26 @@ bool checkPaddle(int paddle[]) {
 }
 
 void roundComplete() {
-  if (!check1) {
-    player2_Score++;
-    xDir = -1;
+  if (!player1.check) {
+    player2.score++;
+    ball.xDir = -1;
   } else {
-    player1_Score++;
-    xDir = 1;
+    player1.score++;
+    ball.xDir = 1;
   }
   Serial.print("Score:\t");
-  Serial.print(player1_Score);
+  Serial.print(player1.score);
   Serial.print("\t");
-  Serial.println(player2_Score);
+  Serial.println(player2.score);
 
-  frame[y][x] = 0;
+  // Recenter ball
+  frame[ball.y][ball.x] = 0;
+  ball.x = 5;
+  ball.y = 4;
+  ball.yDir = 0;
 
-  x = 5;
-  y = 4;
-  yDir = 0;
-
-  if (player1_Score == 5 || player2_Score == 5) {
+  // Go to gameover state 
+  if (player1.score == MAX_SCORE || player2.score == MAX_SCORE) {
     gameOver = true;
   }
 
@@ -104,38 +101,39 @@ void roundComplete() {
 }
 
 void winner() {
-  if (player1_Score > player2_Score) {
+  if (player1.score > player2.score) {
     matrix.loadSequence(Player1Wins);
-  } else if (player2_Score > player1_Score) {
+  } else if (player2.score > player1.score) {
     matrix.loadSequence(Player2Wins);
   }
+
   matrix.play(true);
 }
 
 
 void loop() {
-  
   if (gameOver) {
     winner();
     delay(10000);
     return;
   }
 
-  int player1 = analogRead(A0) / DIVIDE_CONST;
-  int player2 = analogRead(A1) / DIVIDE_CONST;
+  player1.read = analogRead(A0) / DIVIDE_CONST;
+  player2.read = analogRead(A1) / DIVIDE_CONST;
 
   // Clear Paddles
   for (int i = 0; i < PADDLE_SIZE; i++) {
-    frame[paddle1[i]][0] = 0;
-    frame[paddle2[i]][11] = 0;
+    frame[player1.paddle[i]][0] = 0;
+    frame[player2.paddle[i]][WIDTH - 1] = 0;
   }
   
   // Print Paddles
   for (int i = 0; i < PADDLE_SIZE; i++) {
-    paddle1[i] = player1 + i;
-    paddle2[i] = player2 + i;
-    frame[paddle1[i]][0] = 1;
-    frame[paddle2[i]][11] = 1;
+    player1.paddle[i] = player1.read + i;
+    player2.paddle[i] = player2.read + i;
+
+    frame[player1.paddle[i]][0] = 1;
+    frame[player2.paddle[i]][WIDTH - 1] = 1;
   }
 
   k += DELAY;
@@ -145,36 +143,35 @@ void loop() {
     return;
   }
   // Handle ball
-  frame[y][x] = 0;
+  frame[ball.y][ball.x] = 0;
 
-  x += xDir;
-  y += yDir;
-
-  check1 = true;
-  check2 = true;
+  ball.x += ball.xDir;
+  ball.y += ball.yDir;
 
   // If ball is out of bounds / if it hits the boundaries
-  if (y <= 0) {
-    y = 0;
-    yDir = -yDir;
-  } else if (y >= HEIGHT - 1) {
-    y = 7;
-    yDir = -yDir;
+  if (ball.y <= 0) {
+    ball.y = 0;
+    ball.yDir = -ball.yDir;
+  } else if (ball.y >= HEIGHT - 1) {
+    ball.y = HEIGHT - 1;
+    ball.yDir = -ball.yDir;
   }
 
   // Collision Detection
-  if (x == 1) {
-    check1 = checkPaddle(paddle1);
-  } else if (x == 10) {
-    check2 = checkPaddle(paddle2);
+  if (ball.x == 1) {
+    player1.check = checkPaddle(player1.paddle);
+  } else if (ball.x == 10) {
+    player2.check = checkPaddle(player2.paddle);
   }
 
-  frame[y][x] = 1;
+  frame[ball.y][ball.x] = 1;
   k = 0;
   matrix.renderBitmap(frame, HEIGHT, WIDTH);
 
-  if (!check1 || !check2) {
+  if (!player1.check || !player2.check) {
     roundComplete();
+    player1.check = true;
+    player2.check = true;
   }
 
   delay(DELAY);
