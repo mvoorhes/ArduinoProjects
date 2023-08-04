@@ -5,7 +5,7 @@ This is a simple pong clone developed for the Arduino Uno R4. It uses the 8x12 L
 ## Required Parts
 
 - 2 10k Potentiometers
-- Arduino Uno R4
+- Arduino Uno R4 WiFi
 - Jumper Cables
 - Breadboard
 
