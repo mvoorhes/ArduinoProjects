@@ -9,6 +9,10 @@ This is a simple pong clone developed for the Arduino Uno R4. It uses the 8x12 L
 - Jumper Cables
 - Breadboard
 
+## Optional
+
+- 1602 LCD Display (comment out lcd code if unavailable) 
+
 ## Files
 
 - pong_clone.ino:   The main file

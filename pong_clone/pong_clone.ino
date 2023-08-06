@@ -8,11 +8,15 @@
  * (Used above source for the physics regarding the direction of the ball)
  */
 
-
 #include "Arduino_LED_Matrix.h"
 #include "animations.h"
 #include <stdint.h>
 #include <math.h>
+
+// Optional Libraries (If you want to show score (works with I2C displays))
+#include <LiquidCrystal_AIP31068_I2C.h>
+#include <pca9633.h>
+#include <Wire.h>
 
 #define DELAY 1             // Our delay for the paddles / main loop
 #define WIDTH 12            // Width of matrix
@@ -21,6 +25,10 @@
 
 ArduinoLEDMatrix matrix;
 
+// Setting up LCD Display
+LiquidCrystal_AIP31068_I2C lcd(0x3E, 16, 2);  // Using this library instead of LCD_I2C bcuz of my personal display
+PCA9633 rgbw;   // Controls RGB Controller in this display
+
 // Consts
 const int speed = 150;              // How fast the ball is going
 const int max_score = 5;            // Maximum score for the game
@@ -28,7 +36,7 @@ const int max_angle = 5 * PI / 12;  // (75 degrees);
 
 // Variables below are the ranges that our potentiometer moves the paddles by
 const float initialRange = (float) 1024 / (float) (HEIGHT + 1 - PADDLE_SIZE);
-int range;  // Int version of above equation
+int range;  // int version of above equation
 
 // Unused Structs
 struct point {
@@ -66,37 +74,46 @@ uint8_t frame[HEIGHT][WIDTH] = {
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 };
 
-void setup() {
-  Serial.begin(9600);
-  matrix.begin();
-  player1.score = player2.score = 0;
-  player1.check = player2.check = true;
-  Serial.println(initialRange);
-  range = (int) initialRange;
-  if (initialRange - range > 0) {
-    range += 1;
-  }
-  Serial.println(range);
+// Setup for LCD
+void lcd_setup() {
+  Wire.begin();
+  lcd.init();
+  lcd.clear();
+  lcd.setCursor(0,0);
+  rgbw.begin(0x60);
+  rgbw.setrgbw(128,128,128,128);
 }
 
+// Updates score on the LCD Display
+void lcd_updateScore() {
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Player1  Player2");
+  lcd.setCursor(3,1);
+  lcd.print(player1.score);
+  lcd.setCursor(12,1);
+  lcd.print(player2.score);
+}
+
+// Prints winner on display when game is over
+void print_winner() {
+  lcd.clear();
+  lcd.setCursor(0,0);
+  if (player1.score > player2.score) {
+    lcd.print("Player1 Wins!!!");
+  } else {
+    lcd.print("Player2 Wins!!!");
+  }
+}
+
+// When ball reaches paddle, checks if it made contact (or is about to make contact) with paddle
 bool checkPaddle(int paddle[]) {
   // Check if ball has hit paddle directly
-  bool check = false;
-  for (int i = 0; i < PADDLE_SIZE; i++) {
-    if (paddle[i] == ball.y) {
-      check = true;
-      break;
-    }
-  }
-
-  // Handle Edge cases here (If ball will hit paddle by the time it reaches zero)
-  if (check == false) {
-    int tempY = ball.y + ball.yDir;
-    if (tempY == paddle[0] || tempY == paddle[PADDLE_SIZE - 1]) {
-      check = true;
-    } else {
-      return check;
-    }
+  int tempY = ball.y + ball.yDir;     // Checks where the ball is going when x = 0 || x = WIDTH - 1
+  bool directHit = ball.y >= paddle[0] && ball.y <= paddle[PADDLE_SIZE - 1];  // Does the ball directly hit the paddle?
+  bool edgeHit = tempY >= paddle[0] && tempY <= paddle[PADDLE_SIZE - 1] && abs(ball.yDir) <= 1;   // Does the ball touch the edge of the paddle? (only applies when ball.yDir == 1)
+  if (!directHit && !edgeHit) {
+    return false;
   }
 
   // New x direction = negative old direction (matrix is too small to do anything more ambitious)
@@ -108,9 +125,10 @@ bool checkPaddle(int paddle[]) {
   float bounceAngle = normalizedIntersectY * max_angle;
 
   ball.yDir = -round(bounceAngle);
-  return check;
+  return true;
 }
 
+// Function that runs when round is complete
 void roundComplete() {
   if (!player1.check) {
     player2.score++;
@@ -123,6 +141,7 @@ void roundComplete() {
   Serial.print(player1.score);
   Serial.print("\t");
   Serial.println(player2.score);
+  lcd_updateScore();
 
   // Recenter ball
   frame[ball.y][ball.x] = 0;
@@ -143,9 +162,24 @@ void winner() {
     matrix.loadSequence(Player2Wins);
   }
 
+  print_winner();
   matrix.play(true);
 }
 
+void setup() {
+  Serial.begin(9600);
+  matrix.begin();
+  player1.score = player2.score = 0;
+  player1.check = player2.check = true;
+
+  range = (int) initialRange;
+  if (initialRange - range > 0) {
+    range += 1;
+  }
+
+  lcd_setup();
+  lcd_updateScore();
+}
 
 void loop() {
   if (gameOver) {
