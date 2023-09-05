@@ -14,7 +14,7 @@
 #include <math.h>
 
 // Optional Libraries (If you want to show score (works with I2C displays))
-#include <LiquidCrystal_AIP31068_I2C.h>
+#include <LiquidCrystal_AIP31068_I2C.h> // Can be replaced with LCD_I2C (my specific model has an AIP chip though)
 #include <pca9633.h>
 #include <Wire.h>
 
@@ -25,20 +25,23 @@
 
 ArduinoLEDMatrix matrix;
 
+const uint8_t lcd_address = 0x3E;
+const uint8_t rgb_address = 0x60;
+const int brightness = 64;
+
 // Setting up LCD Display
-LiquidCrystal_AIP31068_I2C lcd(0x3E, 16, 2);  // Using this library instead of LCD_I2C bcuz of my personal display
+LiquidCrystal_AIP31068_I2C lcd(lcd_address, 16, 2);
 PCA9633 rgbw;   // Controls RGB Controller in this display
 
 // Consts
-const int speed = 150;              // How fast the ball is going
-const int max_score = 5;            // Maximum score for the game
-const int max_angle = 5 * PI / 12;  // (75 degrees);
+const int speed = 150;                // How fast the ball is going
+const int max_score = 5;              // Maximum score for the game
+const float max_angle = 5 * PI / 12;  // 75 degrees
 
 // Variables below are the ranges that our potentiometer moves the paddles by
 const float initialRange = (float) 1024 / (float) (HEIGHT + 1 - PADDLE_SIZE);
 int range;  // int version of above equation
 
-// Unused Structs
 struct point {
   int x, y, xDir, yDir;
 };
@@ -80,8 +83,8 @@ void lcd_setup() {
   lcd.init();
   lcd.clear();
   lcd.setCursor(0,0);
-  rgbw.begin(0x60);
-  rgbw.setrgbw(128,128,128,128);
+  rgbw.begin(rgb_address);
+  rgbw.setrgbw(brightness,brightness,brightness,brightness);
 }
 
 // Updates score on the LCD Display
@@ -107,7 +110,7 @@ void print_winner() {
 }
 
 // When ball reaches paddle, checks if it made contact (or is about to make contact) with paddle
-bool checkPaddle(int paddle[]) {
+bool collision(int paddle[]) {
   // Check if ball has hit paddle directly
   int tempY = ball.y + ball.yDir;     // Checks where the ball is going when x = 0 || x = WIDTH - 1
   bool directHit = ball.y >= paddle[0] && ball.y <= paddle[PADDLE_SIZE - 1];  // Does the ball directly hit the paddle?
@@ -137,12 +140,9 @@ void roundComplete() {
     player1.score++;
     ball.xDir = 1;  // Ball gets served to player2
   }
-  Serial.print("Score:\t");
-  Serial.print(player1.score);
-  Serial.print("\t");
-  Serial.println(player2.score);
-  lcd_updateScore();
 
+  lcd_updateScore();
+  
   // Recenter ball
   frame[ball.y][ball.x] = 0;
   ball.x = 5;
@@ -171,7 +171,6 @@ void setup() {
   matrix.begin();
   player1.score = player2.score = 0;
   player1.check = player2.check = true;
-
   range = (int) initialRange;
   if (initialRange - range > 0) {
     range += 1;
@@ -207,11 +206,13 @@ void loop() {
   }
 
   k += DELAY;
+  // Ball is handled when we have waited speed ms
   if (k % speed != 0) {
     matrix.renderBitmap(frame, HEIGHT, WIDTH);
     delay(DELAY);
     return;
   }
+
   // Handle ball
   frame[ball.y][ball.x] = 0;
 
@@ -229,9 +230,9 @@ void loop() {
 
   // Collision Detection
   if (ball.x == 1) {
-    player1.check = checkPaddle(player1.paddle);
+    player1.check = collision(player1.paddle);
   } else if (ball.x == 10) {
-    player2.check = checkPaddle(player2.paddle);
+    player2.check = collision(player2.paddle);
   }
 
   frame[ball.y][ball.x] = 1;
