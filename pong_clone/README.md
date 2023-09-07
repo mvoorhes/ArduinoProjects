@@ -23,8 +23,8 @@ This is a simple pong clone developed for the Arduino Uno R4. It uses the 8x12 L
 
 ## Demo
 
-![Demo1](demo_images/demo1.jpg)
+<img src="demo_images/demo1.jpg" width="50%" height="50%">
 
-![Demo2](demo_images/demo2.jpg)
+<img src="demo_images/demo2.jpg" width="50%" height="50%">
 
 ![Demo3](demo_images/demo3.gif)
